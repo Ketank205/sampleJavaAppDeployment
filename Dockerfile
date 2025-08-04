@@ -1,25 +1,22 @@
-# --- build stage ---
-FROM eclipse-temurin:21-jdk-jammy AS build
+# --- build stage with Maven and Java 21 ---
+FROM maven:3.9.4-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
-# Cache Maven dependencies by copying only the pom first
+# Cache dependencies
 COPY pom.xml .
-RUN mkdir -p src && mvn -B -f pom.xml dependency:go-offline
+RUN mvn -B dependency:go-offline
 
-# Copy source and build
+# Copy source and build the fat jar
 COPY src ./src
-RUN mvn -B -f pom.xml clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 # --- runtime stage ---
 FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-# If Render injects PORT, Spring can bind to it if configured; fallback to 8080
-# (You can also set server.port via application.yaml or env var)
-ENV SPRING_MAIN_ALLOW_BEAN_DEFINITION_OVERRIDING=true
-
+# Allow Spring to pick up Render's PORT if provided via environment or application.yaml
 COPY --from=build /app/target/first-deployment-0.0.1.jar app.jar
 
 EXPOSE 8080
